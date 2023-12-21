@@ -1,16 +1,37 @@
-import { useRef } from 'react';
+import { useContext, useRef } from 'react';
 import AnimationWrapper from "../common/page-animation";
 import InputBox from "../components/input.component";
 import googleIcon from "../imgs/google.png";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {Toaster, toast} from 'react-hot-toast';
+import axios from "axios"
+import { storeInSession } from "../common/session";
+import {UserContext} from "../App"
+import { authWithGoogle } from '../common/firebase';
+
+
 
 const UserAuthForm = ({ type }) => {
 
     const authForm = useRef();
 
+
+    let { userAuth: { access_token }, setUserAuth} = useContext(UserContext);
+
+
+
     const userAuthThroughServer = (serverRoute, formData) => {
-        axios.post(import.meta.env.VITE_SERVER_DOMAIN)
+
+        axios.post(import.meta.env.VITE_SERVER_DOMAIN + serverRoute, formData)
+        .then(({data}) => {
+            
+            storeInSession("user", JSON.stringify(data))
+
+            setUserAuth(data)
+        })
+        .catch(({response}) => {
+            toast.error(response.data.error)
+        })
     }
 
     const handleSubmit = (e) => {
@@ -22,7 +43,7 @@ const UserAuthForm = ({ type }) => {
         let passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,20}$/; // regex for password
 
         //formData
-        let form = new FormData(authForm.current);
+        let form = new FormData(formElement);
         let formData = {};
 
         for(let [key, value] of form.entries()){
@@ -52,16 +73,37 @@ const UserAuthForm = ({ type }) => {
         }
     
         userAuthThroughServer(serverRoute, formData)
-     
+
 
     }
 
+    const handleGoogleAuth = (e) => {
+        e.preventDefault();
+
+        authWithGoogle().then(user => {
+            let serverRoute = "/google-auth";
+
+            let formData = {
+                access_token: user.accessToken
+            }
+
+            userAuthThroughServer(serverRoute, formData)
+        })
+        .catch(err => {
+            toast.error('trouble login through google');
+            return console.log(err)
+        })
+    }
+
+
     return(
-        <>
+        access_token ?
+        <Navigate to="/" />
+        :
         <AnimationWrapper keyValue={type}>
         <section className="h-cover flex items-center justify-center">
             <Toaster />
-            <form ref={authForm} className="w-[80%] max-w-[400px]">
+            <form id="formElement" className="w-[80%] max-w-[400px]">
                 <h1 className="text-4xl font-gelasio capitalize text-center mb-24">
                     {type == "sign-in" ? "Welcome back" : "Join us today"}
                 </h1>
@@ -104,7 +146,8 @@ const UserAuthForm = ({ type }) => {
                         <hr className="w-1/2 border-black"/>
                     </div>
 
-                <button className="btn-dark flex items-center justify-center gap-4 w-[90%] center">
+                <button className="btn-dark flex items-center justify-center gap-4 w-[90%] center"
+                onClick={handleGoogleAuth}>
                     <img src={googleIcon} className="w-5"/>
                     continue with google
                 </button>
@@ -129,7 +172,6 @@ const UserAuthForm = ({ type }) => {
             </form>
         </section>
         </AnimationWrapper>
-        </>
     )
 }
 export default UserAuthForm;
