@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import logo from "../imgs/logo.png";
 import AnimationWrapper from "../common/page-animation";
 import defaultBanner from "../imgs/blog banner.png"
@@ -9,19 +9,27 @@ import { EditorContext } from "../pages/editor.pages";
 import EditorJs from "@editorjs/editorjs"
 import {tools} from "./tools.component";
 import { useEffect } from "react";
+import axios from "axios";
+import { UserContext } from "../App";
 const BlogEditor = () => {
 
     
-    let { blog, blog: { title, banner, content, tags, des}, setBlog} = useContext(EditorContext)
+    let { blog, blog: { title, banner, content, tags, des}, setBlog, textEditor, setTextEditor, setEditorState} = useContext(EditorContext)
 
-
+    let { userAuth : {access_token}} = useContext(UserContext)
+    
+    let navigate = useNavigate()
+    
     useEffect(() => {
-        let editor = new EditorJs({
-            holderId: "textEditor",
-            data:'',
-            tools: tools,
-            placeholder:"Let's write an awesome story"
-        })
+        if(!textEditor.isReady){
+            setTextEditor(new EditorJs({
+                holderId: "textEditor",
+                data: content,
+                tools: tools,
+                placeholder:"Let's write an awesome story"
+            }))
+        }
+        
     },[])
 
     const handleBannerUpload = (e) => {
@@ -67,6 +75,80 @@ const BlogEditor = () => {
         img.src = defaultBanner;
     }
 
+    const handlePublishEvent = (e) => {
+
+        if(!banner.length){
+            return toast.error("Upload a blog banner to publish")
+        }
+        if(!title.length){
+            return toast.error("Write blog title to publish it")
+        }
+
+        if(textEditor.isReady){
+            textEditor.save().then(data => {
+                if(data.blocks.length){
+                    setBlog({ ...blog, content: data});
+                    setEditorState("publish")
+                }else{
+                    return toast.error("Write something in your blog to publish it")
+                }
+            })
+            .catch((err) => {
+                console.log(err);
+            })
+        }
+    }
+
+    const handleSaveDraft = (e) => {
+        if(e.target.className.includes("disable")){
+            return;
+        }
+
+        if(!title.length){
+            return toast.error("Write blog title before saving it as a draft")
+        }
+
+        let loadingToast = toast.loading("Saving Draft....");
+
+        e.target.classList.add('disable');
+        
+        if(textEditor.isReady){
+            textEditor.save().then(content => {
+
+                let blogObj = {
+                    title, banner, des, content, tags, draft: true
+                }
+                
+                axios.post(import.meta.env.VITE_SERVER_DOMAIN + "/create-blog",
+         blogObj, {
+            headers : {
+                'Authorization' : `Bearer ${access_token}`
+            }
+         })
+         .then(() => {
+
+            e.target.classList.remove('disable');
+
+            toast.dismiss(loadingToast);
+            toast.success("Saved 👍")
+
+            setTimeout(() => {
+                navigate("/")
+            }, 500);
+
+         })
+         .catch(({ response })=> {
+            e.target.classList.remove('disable');
+            toast.dismiss(loadingToast);
+
+            return toast.error(response.data.error)
+         })
+            })
+        }
+
+    }
+
+
     return(
         <>
         <nav className="navbar">
@@ -77,10 +159,12 @@ const BlogEditor = () => {
                 {title.length ? title : "New Blog"}
             </p>
             <div className="flex gap-4 ml-auto">
-                <button className="btn-dark py-2">
+                <button className="btn-dark py-2"
+                onClick={handlePublishEvent}>
                     Publish
                 </button>
-                <button className="btn-light py-2">
+                <button className="btn-light py-2"
+                onClick={handleSaveDraft}>
                     Save Draft
                 </button>
             </div>
@@ -108,6 +192,7 @@ const BlogEditor = () => {
                     </div>
 
                     <textarea
+                    defaultValue = {title}
                     placeholder="Blog Title"
                     className="text-4xl font-medium w-full h-20 outline-none resize-none mt-10 leading-tight placehoder:opacity-40"
                     onKeyDown={handleTitleKeyDown}

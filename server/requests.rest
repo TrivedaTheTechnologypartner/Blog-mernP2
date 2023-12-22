@@ -1,9 +1,17 @@
-# POST http://localhost:3000/signin 
+# POST http://localhost:3000/signup 
 # Content-Type: application/json
 
 # {
-#     "email" : "kunaal10@gmail.com",
-#     "password" : "Ku"
+#     "fullname" : "john",
+#     "email" : "john@gmail.com",
+#     "password" : "John@123"
 # }
 
-GET http://localhost:3000/get-upload-url
+#GET http://localhost:3000/get-upload-url
+
+POST http://localhost:3000/create-blog
+Content-Type: application/json
+
+{
+    "title": "test title"
+}
